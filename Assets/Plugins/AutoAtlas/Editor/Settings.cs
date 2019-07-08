@@ -52,6 +52,8 @@ namespace AutoAtlas.Editor
                 profile = AssetDatabase.LoadAssetAtPath<Profile>(path);
             }
 
+            profile.LoadBackup();
+
             return profile;
         }
     }

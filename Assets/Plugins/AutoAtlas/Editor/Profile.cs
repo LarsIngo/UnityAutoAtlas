@@ -14,7 +14,12 @@ namespace AutoAtlas.Editor
         private enum PropertyType
         {
             AutoAtlasEnabled,
-            PlayModeEnabled
+            PlayModeEnabled,
+            IsReadable,
+            MipMap,
+            sRGB,
+            FilterMode,
+            MaxSize
         }
 
         public bool AutoAtlasEnabled
@@ -57,15 +62,126 @@ namespace AutoAtlas.Editor
             }
         }
 
+        public bool IsReadable
+        {
+            get
+            {
+                string key = PropertyType.IsReadable.ToString();
+                bool value = false;
+                if (!this.container.GetBool(key, ref value))
+                {
+                    Debug.LogWarning(this.GetType().FullName + ": Unable to find key (" + key + ").");
+                }
+
+                return value;
+            }
+            set
+            {
+                string key = PropertyType.IsReadable.ToString();
+                this.container.SetBool(key, value);
+            }
+        }
+
+        public bool MipMap
+        {
+            get
+            {
+                string key = PropertyType.MipMap.ToString();
+                bool value = false;
+                if (!this.container.GetBool(key, ref value))
+                {
+                    Debug.LogWarning(this.GetType().FullName + ": Unable to find key (" + key + ").");
+                }
+
+                return value;
+            }
+            set
+            {
+                string key = PropertyType.MipMap.ToString();
+                this.container.SetBool(key, value);
+            }
+        }
+
+        public bool sRGB
+        {
+            get
+            {
+                string key = PropertyType.sRGB.ToString();
+                bool value = false;
+                if (!this.container.GetBool(key, ref value))
+                {
+                    Debug.LogWarning(this.GetType().FullName + ": Unable to find key (" + key + ").");
+                }
+
+                return value;
+            }
+            set
+            {
+                string key = PropertyType.sRGB.ToString();
+                this.container.SetBool(key, value);
+            }
+        }
+
+        public FilterMode FilterMode
+        {
+            get
+            {
+                string key = PropertyType.FilterMode.ToString();
+                int value = 0;
+                if (!this.container.GetInt(key, ref value))
+                {
+                    Debug.LogWarning(this.GetType().FullName + ": Unable to find key (" + key + ").");
+                }
+
+                return (FilterMode)value;
+            }
+            set
+            {
+                string key = PropertyType.FilterMode.ToString();
+                this.container.SetInt(key, (int)value);
+            }
+        }
+
+        public int MaxSize
+        {
+            get
+            {
+                string key = PropertyType.MaxSize.ToString();
+                int value = 0;
+                if (!this.container.GetInt(key, ref value))
+                {
+                    Debug.LogWarning(this.GetType().FullName + ": Unable to find key (" + key + ").");
+                }
+
+                return value;
+            }
+            set
+            {
+                string key = PropertyType.MaxSize.ToString();
+                this.container.SetInt(key, value);
+            }
+        }
+
         private Container container = new Container();
+
+        private bool selected = false;
 
         public Profile()
         {
             Selection.selectionChanged += () =>
             {
-                if (Selection.activeObject == this)
+                if (Selection.activeObject == this && !this.selected)
                 {
+                    this.selected = true;
                     this.SaveBackup();
+                }
+                else if (this.selected)
+                {
+                    this.selected = false;
+                    if (!this.container.Empty())
+                    {
+                        this.LoadBackup();
+                    }
                 }
             };
         }
@@ -90,6 +206,11 @@ namespace AutoAtlas.Editor
 
             this.AutoAtlasEnabled = true;
             this.PlayModeEnabled = false;
+            this.IsReadable = false;
+            this.MipMap = false;
+            this.sRGB = true;
+            this.FilterMode = FilterMode.Bilinear;
+            this.MaxSize = 4096;
 
             this.Apply();
         }
@@ -99,7 +220,7 @@ namespace AutoAtlas.Editor
             this.container.Save();
         }
 
-        private void LoadBackup()
+        public void LoadBackup()
         {
             this.container.Load();
         }
@@ -111,14 +232,16 @@ namespace AutoAtlas.Editor
         [CustomEditor(typeof(Profile))]
         public class InspectorEditor : Editor
         {
-            private enum Status
+            private enum FoldoutStatus
             {
-                Done,
-                ShouldUpdate,
-                IsUpdated,
+                Standalone = 1 << 0,
+                Android = 1 << 1,
+                iPhone = 1 << 2
             }
 
-            private Status status = Status.Done;
+            private bool shouldUpdate = false;
+
+            private FoldoutStatus foldoutStatus = 0;
 
             /// <summary>
             /// Draws the custom inspector.
@@ -131,31 +254,113 @@ namespace AutoAtlas.Editor
                     target.container.Load();
                 }
 
+                EditorGUILayout.LabelField("General settings", EditorStyles.boldLabel);
+                EditorGUI.indentLevel++;
+
+                EditorGUI.BeginChangeCheck();
                 target.AutoAtlasEnabled = EditorGUILayout.Toggle("Enabled", target.AutoAtlasEnabled);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
 
                 EditorGUI.BeginDisabledGroup(!target.AutoAtlasEnabled);
+
+                EditorGUI.BeginChangeCheck();
                 target.PlayModeEnabled = EditorGUILayout.Toggle("Play Mode", target.PlayModeEnabled);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField("Texture Settings", EditorStyles.boldLabel);
+                EditorGUI.indentLevel++;
+
+                EditorGUI.BeginChangeCheck();
+                target.IsReadable = EditorGUILayout.Toggle("Read/Write Enabled", target.IsReadable);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.BeginChangeCheck();
+                target.MipMap = EditorGUILayout.Toggle("Generate Mip Maps", target.MipMap);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.BeginChangeCheck();
+                target.sRGB = EditorGUILayout.Toggle("sRGB", target.sRGB);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.BeginChangeCheck();
+                target.FilterMode = (FilterMode)EditorGUILayout.EnumPopup("Filter Mode", target.FilterMode);
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.BeginChangeCheck();
+                target.MaxSize = EditorGUILayout.IntPopup("Max Size", target.MaxSize, new string[] { "32", "64", "128", "256", "512", "1024", "2048", "4096", "8192" }, new int[] { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 });
+                editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField("Platform Settings", EditorStyles.boldLabel);
+                EditorGUI.indentLevel++;
+
+                if (EditorGUILayout.Foldout((editor.foldoutStatus & FoldoutStatus.Standalone) == FoldoutStatus.Standalone, "PC, Mac & Linus Standalone", true))
+                {
+                    editor.foldoutStatus |= FoldoutStatus.Standalone;
+
+                    EditorGUI.BeginChangeCheck();
+                    target.MaxSize = EditorGUILayout.IntPopup("Max Size", target.MaxSize, new string[] { "32", "64", "128", "256", "512", "1024", "2048", "4096", "8192" }, new int[] { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 });
+                    editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+                }
+                else
+                {
+                    editor.foldoutStatus &= ~FoldoutStatus.Standalone;
+                }
+
+                if (EditorGUILayout.Foldout((editor.foldoutStatus & FoldoutStatus.iPhone) == FoldoutStatus.iPhone, "iOS", true))
+                {
+                    editor.foldoutStatus |= FoldoutStatus.iPhone;
+
+                    EditorGUI.BeginChangeCheck();
+                    target.MaxSize = EditorGUILayout.IntPopup("Max Size", target.MaxSize, new string[] { "32", "64", "128", "256", "512", "1024", "2048", "4096", "8192" }, new int[] { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 });
+                    editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+                }
+                else
+                {
+                    editor.foldoutStatus &= ~FoldoutStatus.iPhone;
+                }
+
+                if (EditorGUILayout.Foldout((editor.foldoutStatus & FoldoutStatus.Android) == FoldoutStatus.Android, "Android", true))
+                {
+                    editor.foldoutStatus |= FoldoutStatus.Android;
+
+                    EditorGUI.BeginChangeCheck();
+                    target.MaxSize = EditorGUILayout.IntPopup("Max Size", target.MaxSize, new string[] { "32", "64", "128", "256", "512", "1024", "2048", "4096", "8192" }, new int[] { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 });
+                    editor.shouldUpdate = EditorGUI.EndChangeCheck() ? true : editor.shouldUpdate;
+                }
+                else
+                {
+                    editor.foldoutStatus &= ~FoldoutStatus.Android;
+                }
+
                 EditorGUI.EndDisabledGroup();
 
-                if (editor.status == Status.ShouldUpdate)
+                EditorGUILayout.Space();
+
+                EditorGUI.BeginDisabledGroup(!editor.shouldUpdate);
+                EditorGUILayout.BeginHorizontal();
+
+                if (GUILayout.Button("Apply"))
                 {
-                    if (GUILayout.Button("Apply"))
-                    {
-                        target.SaveBackup();
-                        target.Apply();
-                        editor.status = Status.IsUpdated;
-                    }
-                    if (GUILayout.Button("Discard"))
-                    {
-                        target.LoadBackup();
-                        editor.status = Status.IsUpdated;
-                    }
+                    target.SaveBackup();
+                    target.Apply();
+                    editor.shouldUpdate = false;
                 }
+
+                if (GUILayout.Button("Discard"))
+                {
+                    target.LoadBackup();
+                    editor.shouldUpdate = false;
+                }
+
+                EditorGUILayout.EndHorizontal();
+                EditorGUI.EndDisabledGroup();
 
                 if (GUILayout.Button("Reset"))
                 {
                     target.ResetProfile();
-                    editor.status = Status.IsUpdated;
+                    editor.shouldUpdate = false;
                 }
             }
 
@@ -164,23 +369,16 @@ namespace AutoAtlas.Editor
             /// </summary>
             public override void OnInspectorGUI()
             {
-                EditorGUI.BeginChangeCheck();
+                Profile target = (Profile)this.target;
+
+                if (target.container.Empty())
+                {
+                    target.LoadBackup();
+                }
 
                 DrawDefaultInspector();
 
-                DrawCustomInspector((Profile)this.target, this);
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    if (this.status == Status.IsUpdated)
-                    {
-                        this.status = Status.Done;
-                    }
-                    else if (this.status == Status.Done)
-                    {
-                        this.status = Status.ShouldUpdate;
-                    }
-                }
+                DrawCustomInspector(target, this);
             }
         }
 
