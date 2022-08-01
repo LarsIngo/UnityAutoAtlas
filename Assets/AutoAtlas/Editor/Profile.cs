@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-namespace AutoAtlas.Editor
+﻿namespace AutoAtlas.Editor
 {
     using System;
     using System.Collections;
@@ -9,6 +8,7 @@ namespace AutoAtlas.Editor
     using UnityEngine;
     using UnityEngine.U2D;
 
+    [CreateAssetMenu(fileName = "AutoAtlasProfile", menuName = "AutoAtlas/Create Profile", order = 1)]
     public class Profile : ScriptableObject
     {
         private enum PropertyType
@@ -496,5 +496,3 @@ namespace AutoAtlas.Editor
         }
     }
 }
-
-#endif

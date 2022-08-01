@@ -1,16 +1,34 @@
-﻿#if UNITY_EDITOR
-namespace AutoAtlas.Editor
+﻿namespace AutoAtlas.Editor
 {
     using System;
     using System.Collections;
     using System.Collections.Generic;
     using UnityEditor;
+    using UnityEditor.Build;
+    using UnityEditor.Build.Reporting;
     using UnityEditor.U2D;
     using UnityEngine;
     using UnityEngine.U2D;
 
     public static class AutoAtlas
     {
+        static AutoAtlas()
+        {
+            EditorApplication.playModeStateChanged += OnPlayModeState;
+        }
+
+        private static void OnPlayModeState(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode)
+            {
+                AutoAtlas.CreateAtlases();
+            }
+            else if (state == PlayModeStateChange.EnteredEditMode)
+            {
+                AutoAtlas.DeleteAtlases();
+            }
+        }
+
         public static void DeleteAtlases()
         {
             string outputPath = Utility.GetOutputPath();
@@ -110,7 +128,26 @@ namespace AutoAtlas.Editor
 
             return dictionary;
         }
+
+        private class BuildEvents : IPreprocessBuildWithReport, IPostprocessBuildWithReport
+        {
+            public int callbackOrder
+            {
+                get
+                {
+                    return 0;
+                }
+            }
+
+            public void OnPreprocessBuild(BuildReport report)
+            {
+                AutoAtlas.CreateAtlases();
+            }
+
+            public void OnPostprocessBuild(BuildReport report)
+            {
+                AutoAtlas.DeleteAtlases();
+            }
+        }
     }
 }
-
-#endif
