@@ -4,6 +4,7 @@
     using UnityEditor;
     using UnityEditor.Build;
     using UnityEditor.Build.Reporting;
+    using UnityEditor.U2D;
     using UnityEngine;
     using UnityEngine.U2D;
 
@@ -65,7 +66,7 @@
             List<string> paths = GetReferencedTextures();
 
             // Store sprites and their folder path.
-            Dictionary<string, Dictionary<bool, List<Sprite>>> spriteDictionary = new Dictionary<string, Dictionary<bool, List<Sprite>>>();
+            Dictionary<string, Dictionary<Settings, List<Sprite>>> spriteDictionary = new Dictionary<string, Dictionary<Settings, List<Sprite>>>();
             foreach (string path in paths)
             {
                 // Load sprite.
@@ -88,19 +89,20 @@
                     string folderPath = path.Substring(0, path.LastIndexOf("/"));
                     if (!spriteDictionary.ContainsKey(folderPath))
                     {
-                        spriteDictionary[folderPath] = new Dictionary<bool, List<Sprite>>();
+                        spriteDictionary[folderPath] = new Dictionary<Settings, List<Sprite>>();
                     }
 
                     // Check whether format has alpha values.
-                    bool alpha = HasAlpha(sprite.texture.format);
+                    //bool alpha = HasAlpha(sprite.texture.format);
+                    Settings settings = new Settings(sprite);
 
-                    if (!spriteDictionary[folderPath].ContainsKey(alpha))
+                    if (!spriteDictionary[folderPath].ContainsKey(settings))
                     {
-                        spriteDictionary[folderPath][alpha] = new List<Sprite>();
+                        spriteDictionary[folderPath][settings] = new List<Sprite>();
                     }
 
                     // Check whether to add sprite.
-                    List<Sprite> sprites = spriteDictionary[folderPath][alpha];
+                    List<Sprite> sprites = spriteDictionary[folderPath][settings];
                     if (!sprites.Contains(sprite))
                     {
                         sprites.Add(sprite);
@@ -109,14 +111,14 @@
             }
 
             // Iterate directories and create sprite atlas.
-            foreach (KeyValuePair<string, Dictionary<bool, List<Sprite>>> pairA in spriteDictionary)
+            foreach (KeyValuePair<string, Dictionary<Settings, List<Sprite>>> pairA in spriteDictionary)
             {
                 string folderPath = pairA.Key;
 
                 // Iterate sprites to pack.
-                foreach (KeyValuePair<bool, List<Sprite>> pairB in pairA.Value)
+                foreach (KeyValuePair<Settings, List<Sprite>> pairB in pairA.Value)
                 {
-                    bool alpha = pairB.Key;
+                    Settings settings = pairB.Key;
                     List<Sprite> sprites = pairB.Value;
 
                     const uint maxSize = 2048U;
@@ -133,7 +135,7 @@
                         currentSize = itSize;
 
                         // Pack atlas using current size.
-                        spriteAtlas = PackAtlas(folderPath, currentSize, sprites, alpha);
+                        spriteAtlas = PackAtlas(folderPath, currentSize, sprites, settings);
                         List<Texture2D> textures = GetSpriteAtlasTextures(spriteAtlas);
                         textureCount = (uint)textures.Count;
 
@@ -158,7 +160,7 @@
                     // Repack atlas if needed.
                     if (currentSize != finalSize)
                     {
-                        spriteAtlas = PackAtlas(folderPath, finalSize, sprites, alpha);
+                        spriteAtlas = PackAtlas(folderPath, finalSize, sprites, settings);
                     }
 
                     Debug.Log(typeof(AutoAtlas).FullName + ".GenerateAtlases: Packed atlas (" + folderPath + ").", spriteAtlas);
@@ -190,51 +192,51 @@
         /// <param name="dir">Atlas path.</param>
         /// <param name="size">Max size of atlas texture.</param>
         /// <param name="sprites">Sprites to pack.</param>
-        /// <param name="alpha">Whether sprites used alpha.</param>
+        /// <param name="settings">Settings for the sprites.</param>
         /// <returns>The sprite atlas.</returns>
-        private static SpriteAtlas PackAtlas(string dir, uint size, List<Sprite> sprites, bool alpha)
+        private static SpriteAtlas PackAtlas(string dir, uint size, List<Sprite> sprites, Settings settings)
         {
             // Create atlas and add sprites.
             SpriteAtlas spriteAtlas = new SpriteAtlas();
-            UnityEditor.U2D.SpriteAtlasExtensions.Add(spriteAtlas, sprites.ToArray());
+            SpriteAtlasExtensions.Add(spriteAtlas, sprites.ToArray());
 
             // Set general settings.
-            UnityEditor.U2D.SpriteAtlasPackingSettings packingSettings = UnityEditor.U2D.SpriteAtlasExtensions.GetPackingSettings(spriteAtlas);
-            UnityEditor.U2D.SpriteAtlasTextureSettings textureSettings = UnityEditor.U2D.SpriteAtlasExtensions.GetTextureSettings(spriteAtlas);
+            SpriteAtlasPackingSettings packingSettings = SpriteAtlasExtensions.GetPackingSettings(spriteAtlas);
+            SpriteAtlasTextureSettings textureSettings = SpriteAtlasExtensions.GetTextureSettings(spriteAtlas);
             packingSettings.enableTightPacking = false;
             packingSettings.enableRotation = false;
-            textureSettings.generateMipMaps = GenerateMipMaps(sprites);
-            UnityEditor.U2D.SpriteAtlasExtensions.SetPackingSettings(spriteAtlas, packingSettings);
-            UnityEditor.U2D.SpriteAtlasExtensions.SetTextureSettings(spriteAtlas, textureSettings);
-            UnityEditor.U2D.SpriteAtlasExtensions.SetIncludeInBuild(spriteAtlas, true);
+            textureSettings.generateMipMaps = settings.Mips;
+            SpriteAtlasExtensions.SetPackingSettings(spriteAtlas, packingSettings);
+            SpriteAtlasExtensions.SetTextureSettings(spriteAtlas, textureSettings);
+            SpriteAtlasExtensions.SetIncludeInBuild(spriteAtlas, true);
 
             // Set platform settings for Android.
-            TextureImporterPlatformSettings platformSettings = UnityEditor.U2D.SpriteAtlasExtensions.GetPlatformSettings(spriteAtlas, "Android");
+            TextureImporterPlatformSettings platformSettings = SpriteAtlasExtensions.GetPlatformSettings(spriteAtlas, "Android");
             platformSettings.overridden = true;
             platformSettings.maxTextureSize = (int)size;
-            platformSettings.format = alpha ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.ETC2_RGB4;
-            UnityEditor.U2D.SpriteAtlasExtensions.SetPlatformSettings(spriteAtlas, platformSettings);
+            platformSettings.format = settings.Alpha ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.ETC2_RGB4;
+            SpriteAtlasExtensions.SetPlatformSettings(spriteAtlas, platformSettings);
 
             // Set platform settings for iOS.
-            platformSettings = UnityEditor.U2D.SpriteAtlasExtensions.GetPlatformSettings(spriteAtlas, "iPhone");
+            platformSettings = SpriteAtlasExtensions.GetPlatformSettings(spriteAtlas, "iPhone");
             platformSettings.overridden = true;
             platformSettings.maxTextureSize = (int)size;
-            platformSettings.format = alpha ? TextureImporterFormat.PVRTC_RGBA4 : TextureImporterFormat.PVRTC_RGB4;
-            UnityEditor.U2D.SpriteAtlasExtensions.SetPlatformSettings(spriteAtlas, platformSettings);
+            platformSettings.format = settings.Alpha ? TextureImporterFormat.PVRTC_RGBA4 : TextureImporterFormat.PVRTC_RGB4;
+            SpriteAtlasExtensions.SetPlatformSettings(spriteAtlas, platformSettings);
 
             // Get folder name.
             int index = dir.LastIndexOf("/") + 1;
             string folderName = dir.Substring(index, dir.Length - index);
 
             // Generate sprite atlas name and path.
-            string name = folderName + "_Atlas_" + (alpha ? "RGBA" : "RGB");
+            string name = folderName + "_AutoAtlas_" + (settings.Alpha ? "RGBA" : "RGB") + "_" + (settings.Mips ? "Mips" : "NoMips");
             string path = dir + "/" + name + ".spriteatlas";
 
             // Create sprite atlas.
             AssetDatabase.CreateAsset(spriteAtlas, path);
 
             // Pack atlas.
-            UnityEditor.U2D.SpriteAtlasUtility.PackAllAtlases(EditorUserBuildSettings.activeBuildTarget, false);
+            SpriteAtlasUtility.PackAllAtlases(EditorUserBuildSettings.activeBuildTarget, false);
 
             // Refresh database.
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
@@ -404,6 +406,32 @@
                 }
 
                 ClearMaterials(materials);
+            }
+        }
+
+        /// <summary>
+        /// Contains configuration settings for sprites.
+        /// </summary>
+        private struct Settings
+        {
+            /// <summary>
+            /// Gets whether texture has alpha.
+            /// </summary>
+            public bool Alpha { get; private set; }
+
+            /// <summary>
+            /// Gets whether texture has mips.
+            /// </summary>
+            public bool Mips { get; private set; }
+            
+            /// <summary>
+            /// The constructor.
+            /// </summary>
+            /// <param name="sprite">The sprite to create settings for.</param>
+            public Settings(Sprite sprite)
+            {
+                this.Alpha = HasAlpha(sprite.texture.format);
+                this.Mips = sprite.texture.mipmapCount > 1;
             }
         }
 
