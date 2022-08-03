@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fdeec0060b2b7964ab6df23f02fff965, type: 3}
   m_Name: AutoAtlasProfile
   m_EditorClassIdentifier: 
+  scenes:
+  - {fileID: 102900000, guid: 7741fc3aa27c2d241b9998cb50cc6b98, type: 3}

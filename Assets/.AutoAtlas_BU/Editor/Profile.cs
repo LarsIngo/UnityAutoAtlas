@@ -11,6 +11,9 @@
     [CreateAssetMenu(fileName = "AutoAtlasProfile", menuName = "AutoAtlas/Create Profile", order = 1)]
     public class Profile : ScriptableObject
     {
+        [SerializeField]
+        private SceneAsset[] scenes = default;
+
         private enum PropertyType
         {
             AutoAtlasEnabled,
@@ -21,6 +24,8 @@
             FilterMode,
             MaxSize
         }
+
+        public string Path => AssetDatabase.GetAssetPath(this);
 
         public bool AutoAtlasEnabled
         {
